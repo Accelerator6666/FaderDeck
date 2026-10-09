@@ -1,3 +1,4 @@
+using FaderDeck.Core;
 using System.Buffers.Binary;
 using System.Text;
 
