@@ -8,7 +8,8 @@
 - [x] Host protocol and synchronization gate tests source
 - [x] CI build workflows defined
 - [x] First GitHub Actions builds verified
-- [ ] CI downloadable artifacts verified on a successful run
+- [x] CI downloadable artifacts verified on a successful run
+- [x] Hardware-free VirtualFader command emulator and safety tests
 - [ ] INFO / DIAGNOSE / WATCH validated with physical FaderBuddy
 - [ ] Physical ESP32-S3 + FaderBuddy wiring validated
 - [ ] Position readback, touch blocking, manual motor moves tested

@@ -22,6 +22,8 @@ jobs:
         run: dotnet build software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release
       - name: Run core tests
         run: dotnet run --project tests/FaderDeck.Core.Tests -c Release
+      - name: Run hardware-free simulator demo
+        run: dotnet run --project software/FaderDeck.Cli -c Release -- sim --demo
       - name: Publish standalone Windows x64 CLI
         run: dotnet publish software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o dist/windows
       - name: Upload Windows diagnostic CLI

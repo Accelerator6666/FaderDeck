@@ -2,11 +2,115 @@ using System.Globalization;
 using System.IO.Ports;
 using FaderDeck.Core;
 
+static bool SimLine(VirtualFader sim, string line)
+{
+    string[] p = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    if (p.Length == 0) return true;
+    static bool OnOff(string[] p, out bool value)
+    {
+        value = false;
+        if (p.Length != 2) return false;
+        if (p[1].Equals("on", StringComparison.OrdinalIgnoreCase)) { value = true; return true; }
+        if (p[1].Equals("off", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    try
+    {
+        switch (p[0].ToLowerInvariant())
+        {
+            case ":quit":
+            case ":exit":
+                return false;
+            case ":help":
+                Console.WriteLine("Firmware-compatible: PING, INFO, STATE, LAYER n, MOVE layer position speed, CALIBRATE");
+                Console.WriteLine("Emulator-only: :touch on|off, :manual 0..255, :busy on|off, :fault on|off, :connect on|off, :protocol 0..255, :caldone, :quit");
+                return true;
+            case ":touch":
+                if (!OnOff(p, out bool touch)) break;
+                sim.SetTouch(touch);
+                Console.WriteLine($"SIM Touch={touch}");
+                return true;
+            case ":busy":
+                if (!OnOff(p, out bool busy)) break;
+                sim.SetBusy(busy);
+                Console.WriteLine($"SIM Busy={busy}");
+                return true;
+            case ":fault":
+                if (!OnOff(p, out bool fault)) break;
+                sim.SetFault(fault);
+                Console.WriteLine($"SIM Fault={fault}");
+                return true;
+            case ":connect":
+                if (!OnOff(p, out bool connected)) break;
+                sim.SetConnected(connected);
+                Console.WriteLine($"SIM Connected={connected}");
+                return true;
+            case ":manual":
+                if (p.Length != 2 || !byte.TryParse(p[1], out byte position)) break;
+                sim.ManualMove(position);
+                Console.WriteLine($"SIM Manual position={position}");
+                return true;
+            case ":protocol":
+                if (p.Length != 2 || !byte.TryParse(p[1], out byte protocol)) break;
+                sim.SetProtocol(protocol);
+                Console.WriteLine($"SIM I2C protocol={protocol}");
+                return true;
+            case ":caldone":
+                if (p.Length != 1) break;
+                sim.FinishCalibration();
+                Console.WriteLine("SIM Calibration complete");
+                return true;
+            default:
+                if (p[0].StartsWith(':')) break;
+                Console.WriteLine(sim.Execute(line));
+                return true;
+        }
+    }
+    catch (InvalidOperationException e)
+    {
+        Console.WriteLine("SIM ERROR " + e.Message);
+        return true;
+    }
+    Console.WriteLine("SIM Invalid simulator command. Use :help.");
+    return true;
+}
+
+static void Simulate(bool demo)
+{
+    var sim = new VirtualFader();
+    Console.WriteLine("FaderDeck Virtual Fader (no hardware / no physical motor simulation)");
+    if (demo)
+    {
+        string[] script = [
+            "PING", "INFO", "STATE", "MOVE 0 200 128", "STATE",
+            ":touch on", "MOVE 0 50 128", ":manual 155", "STATE",
+            ":touch off", "LAYER 1", "STATE", "MOVE 1 45 128",
+            "STATE", ":fault on", "MOVE 1 20 128", ":fault off",
+            ":connect off", "STATE", ":connect on", "INFO", "STATE"
+        ];
+        foreach (string line in script)
+        {
+            Console.WriteLine("> " + line);
+            SimLine(sim, line);
+        }
+        return;
+    }
+
+    Console.WriteLine("Enter :help for emulator controls, :quit to exit.");
+    string? input;
+    while ((input = Console.ReadLine()) != null)
+    {
+        if (!SimLine(sim, input)) break;
+    }
+}
+
 static void Help()
 {
     Console.WriteLine("FaderDeck M0 diagnostics (USB Serial/JTAG, no software integration yet)");
     Console.WriteLine("Usage:");
     Console.WriteLine("  faderdeck ports");
+    Console.WriteLine("  faderdeck sim [--demo]   (no hardware required)");
     Console.WriteLine("  faderdeck <PORT> ping|info|state|diagnose|watch [count]");
     Console.WriteLine("  faderdeck <PORT> layer <0..7>");
     Console.WriteLine("  faderdeck <PORT> move <layer> <position> <speed>");
@@ -54,6 +158,18 @@ static bool PrintValidatedReply(string request, string response)
         return true;
     }
     return response == "OK " + request.Split(' ', 2)[0];
+}
+
+if (args.Length > 0 && args[0].Equals("sim", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length == 1 || (args.Length == 2 && args[1] == "--demo"))
+        Simulate(args.Length == 2);
+    else
+    {
+        Help();
+        Environment.ExitCode = 2;
+    }
+    return;
 }
 
 if (args.Length == 1 && args[0].Equals("ports", StringComparison.OrdinalIgnoreCase))

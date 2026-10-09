@@ -1,6 +1,6 @@
 # FaderDeck / 模块化电动控制台
 
-[English](README.md) · [架构](docs/ARCHITECTURE.md) · [通信协议](docs/PROTOCOL.md) · [开发路线](docs/ROADMAP.md) · [硬件验收清单](docs/HARDWARE_TEST.zh-CN.md)
+[English](README.md) · [架构](docs/ARCHITECTURE.md) · [通信协议](docs/PROTOCOL.md) · [开发路线](docs/ROADMAP.md) · [硬件验收清单](docs/HARDWARE_TEST.zh-CN.md) · [虚拟推子模拟器](docs/SIMULATOR.zh-CN.md)
 
 FaderDeck 是一套可扩展的开源电动推子控制系统，规划支持 OBS Studio、REAPER、Ableton Live 和 DaVinci Resolve 等软件。
 
@@ -15,6 +15,17 @@ FaderDeck 是一套可扩展的开源电动推子控制系统，规划支持 OBS
 - GitHub Actions 自动编译与核心逻辑测试
 
 **尚未实现**：OBS/REAPER/DaVinci 适配器、桌面图形管理软件、四路同步、USB MIDI、电动推子自动跟随真实软件参数。
+
+## 没有硬件也能测试：VirtualFader
+
+现在可使用虚拟推子模拟器，不依赖 ESP32-S3，也不需要 COM 端口或真实电动推子：
+
+```powershell
+dotnet run --project software/FaderDeck.Cli -- sim --demo
+dotnet run --project software/FaderDeck.Cli -- sim
+```
+
+也可以从 GitHub Actions 下载 Windows CLI 后执行 `FaderDeck.Cli.exe sim --demo`。模拟器支持推子位置、8 层功能、触摸、故障、断开与恢复测试，但**不能代表真实硬件精度和安全性**。详见[模拟器说明](docs/SIMULATOR.zh-CN.md)。
 
 ## M0 接线
 

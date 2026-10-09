@@ -2,7 +2,7 @@
 
 **FaderDeck** is an open-source modular motorized control surface for creative applications.
 
-[简体中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Protocol](docs/PROTOCOL.md) · [Roadmap](docs/ROADMAP.md) · [Hardware bench checklist (中文)](docs/HARDWARE_TEST.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Protocol](docs/PROTOCOL.md) · [Roadmap](docs/ROADMAP.md) · [Hardware bench checklist (中文)](docs/HARDWARE_TEST.zh-CN.md) · [Simulator (中文)](docs/SIMULATOR.zh-CN.md)
 
 ## Status
 
@@ -15,8 +15,20 @@ The initial proof of concept pairs **one ESP32-S3** with **one FaderBuddy** moto
 | ESP32-S3 single-fader USB Serial/JTAG bridge | Initial source, awaiting real hardware validation |
 | I2C FaderBuddy protocol-v5 integration | Initial source, awaiting real hardware validation |
 | Windows command-line diagnostics | Initial source |
+| VirtualFader software-only emulator | Implemented with unit tests; no hardware required |
 | Parameter synchronization safety gate | Implemented in core library with source-level tests |
 | Four-fader modules, USB MIDI, application adapters, GUI | Planned |
+
+## Hardware-free simulator
+
+No electronics yet? Run the built-in VirtualFader simulator to test the diagnostic protocol and safety logic. This **does not simulate electrical or mechanical behavior** and uses no serial port:
+
+```powershell
+dotnet run --project software/FaderDeck.Cli -- sim --demo
+dotnet run --project software/FaderDeck.Cli -- sim
+```
+
+Or use `FaderDeck.Cli.exe sim --demo` from the Windows Actions artifact. See [Chinese simulator instructions](docs/SIMULATOR.zh-CN.md).
 
 ## Hardware (M0)
 
