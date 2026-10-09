@@ -41,7 +41,8 @@
 
 - [ ] OBS WebSocket input volume read/write + change subscriptions
 - [x] REAPER localhost UDP OSC volume codec and event adapter (software-only, CI-tested)
-- [ ] REAPER Studio GUI integration and actual REAPER end-to-end acceptance
+- [x] Standalone REAPER OSC Studio preview window, four virtual faders and 8 banks
+- [ ] REAPER end-to-end acceptance with an actual REAPER instance
 - [ ] Verified feedback-to-motor sync & human touch precedence
 
 ## M4 — ecosystem

@@ -281,6 +281,13 @@ public sealed class StudioWindow : Window
             Margin = new Thickness(25)
         };
         root.Children.Add(heading);
+        var reaperButton = new Button
+        {
+            Content = "打开 REAPER OSC 控制台（无硬件预览）",
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        reaperButton.Click += (_, _) => new ReaperOscWindow().Show(this);
+        root.Children.Add(reaperButton);
         root.Children.Add(connectionRow);
         root.Children.Add(headlineStatus);
         root.Children.Add(editorPanel);

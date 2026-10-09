@@ -1,6 +1,6 @@
 # REAPER OSC 适配器 — 无硬件原型
 
-本模块位于 `software/FaderDeck.Reaper`，提供 OSC 1.0 单个 Float32 参数编码/解码，以及本机 UDP 发送/接收服务。支持 `/track/@/volume` 音量参数。**首次提交仅提供通信适配器和自动化测试，尚未在 FaderDeck Studio GUI 中接线，也未在真正 REAPER 内验收。**
+本模块位于 `software/FaderDeck.Reaper`，提供 OSC 1.0 单个 Float32 参数编码/解码，以及本机 UDP 发送/接收服务。支持 `/track/@/volume` 音量参数。**已提供独立的 REAPER OSC 图形窗口；尚未在真实 REAPER 上验收。** 在 FaderDeck Studio 主窗口点击“打开 REAPER OSC 控制台”，不影响现有 OBS 模式。
 
 ## REAPER OSC 参考设置
 
@@ -31,3 +31,15 @@
 - `davinci`：仅注册不可读/不可写的公开脚本 API 能力占位，**不会发送假的调色轮控制指令**。
 
 首次生成通用 profiles.json 时可读取并转换旧的 `obs-mappings.json`，**保留旧文件、不自动覆盖**。目前 OBS GUI 仍使用旧文件，真正共享新 Profile 的图形界面整合在下一步完成。
+
+## 使用 REAPER 图形控制窗口
+
+1. 在 GitHub Actions 最新成功的工作流中下载 `FaderDeck-Studio-Windows-x64`，完整解压并启动程序。
+2. 单击主界面的“打开 REAPER OSC 控制台（无硬件预览）”。
+3. 设置 REAPER 接收端口（默认 8000）、Studio 回传端口（默认 9000），点击“启动 OSC”。这一步仅代表 UDP 端口绑定，并**不表示 REAPER 已在线**。
+4. Bank 1 默认绑定 Track 1–4；Bank 2 对应 Track 5–8，最多 Bank 8 的 Track 29–32。
+5. 每路可以选“自动音轨”“Track 1–32”“不绑定”。设置保存到 `profiles.json`，不会覆盖旧的 OBS 映射文件。
+6. 拖动虚拟推子发送 OSC；在收到 REAPER 真正发来的轨道音量回传前，状态显示“已发送（未确认）”，不会误标 Verified。
+7. 收到本机的 `/track/n/volume` float 反馈才会绿色显示 Verified。建议先从空白 REAPER 工程的 1–4 号轨验证。
+
+当前 GUI 不假设 OSC 数据包有 ACK。即使点了“启动 OSC”，也不能保证 REAPER 已收到控制信号。请检查 REAPER 控制面的 OSC pattern 与端口映射。

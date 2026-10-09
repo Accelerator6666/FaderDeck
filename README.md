@@ -48,6 +48,12 @@ dotnet run --project software/FaderDeck.Studio -c Release
 
 See [Studio guide (简体中文)](docs/STUDIO.zh-CN.md).
 
+## REAPER OSC preview
+
+Select **“打开 REAPER OSC 控制台”** in the Studio window. A separate four-fader GUI sends normalized OSC track-volume values to local REAPER (default UDP 8000) and listens for feedback (default UDP 9000). The UI distinguishes UDP send from verified feedback. Configure REAPER's OSC surface before use; real REAPER integration remains unverified.
+
+See [REAPER instructions (中文)](docs/REAPER.zh-CN.md).
+
 ## Hardware (M0)
 
 - ESP32-S3 development board exposing its **native USB Serial/JTAG** port

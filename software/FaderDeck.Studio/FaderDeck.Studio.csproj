@@ -12,5 +12,6 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <ProjectReference Include="../FaderDeck.Core/FaderDeck.Core.csproj" />
     <ProjectReference Include="../FaderDeck.Obs/FaderDeck.Obs.csproj" />
+    <ProjectReference Include="../FaderDeck.Reaper/FaderDeck.Reaper.csproj" />
   </ItemGroup>
 </Project>
