@@ -95,4 +95,63 @@ string obsAuth = ObsProtocol.Authentication("secret", "salt", "challenge");
 Assert(obsAuth.Length == 44 && obsAuth.EndsWith('='), "OBS auth is base64 SHA256");
 Assert(obsAuth == ObsProtocol.Authentication("secret", "salt", "challenge"), "OBS auth deterministic");
 Assert(obsAuth != ObsProtocol.Authentication("bad", "salt", "challenge"), "OBS auth depends on password");
+
+var mapping = new ObsMappingProfile();
+string[] obsInputs = ["Microphone", "Desktop Audio", "Music", "Game", "Narration"];
+Assert(mapping.Get(0, 0) == FaderBinding.Auto, "default mapping uses Auto");
+Assert(mapping.Resolve(0, 0, obsInputs) == "Microphone", "auto bank 0 slot 0");
+Assert(mapping.Resolve(0, 3, obsInputs) == "Game", "auto fourth slot");
+Assert(mapping.Resolve(1, 0, obsInputs) == "Narration", "second bank first slot");
+Assert(mapping.Resolve(1, 1, obsInputs) is null, "auto slot beyond available sources disabled");
+mapping.Set(0, 0, FaderBinding.ForInput("Music"));
+Assert(mapping.Resolve(0, 0, obsInputs) == "Music", "explicit binding overrides order");
+Assert(mapping.Resolve(0, 0, ["Desktop Audio", "Music"]) == "Music", "explicit remains stable after reorder");
+Assert(mapping.Resolve(0, 0, ["Microphone"]) is null, "missing explicit input never falls back");
+mapping.Set(0, 1, FaderBinding.Unassigned);
+Assert(mapping.Resolve(0, 1, obsInputs) is null, "unassigned slot disabled");
+Assert(mapping.Get(0, 2) == FaderBinding.Auto, "other slot unchanged");
+Assert(mapping.Get(1, 0) == FaderBinding.Auto, "other bank unchanged");
+
+string serialized = mapping.ToJson();
+Assert(!serialized.Contains("password", StringComparison.OrdinalIgnoreCase), "profile cannot contain OBS password");
+var fromJson = ObsMappingProfile.FromJson(serialized);
+Assert(fromJson.Get(0, 0) == FaderBinding.ForInput("Music"), "explicit JSON round trip");
+Assert(fromJson.Get(0, 1) == FaderBinding.Unassigned, "unassigned JSON round trip");
+Assert(fromJson.Get(1, 0) == FaderBinding.Auto, "default JSON round trip");
+
+string workingDir = Path.Combine(Path.GetTempPath(), "faderdeck-map-test-" + Guid.NewGuid().ToString("N"));
+string path = Path.Combine(workingDir, "obs-mappings.json");
+try
+{
+    mapping.Save(path);
+    Assert(File.Exists(path), "profile saved");
+    Assert(ObsMappingProfile.Load(path).Resolve(0, 0, obsInputs) == "Music", "profile reload");
+    mapping.Set(0, 0, FaderBinding.ForInput("Microphone"));
+    mapping.Save(path);
+    Assert(ObsMappingProfile.Load(path).Resolve(0, 0, obsInputs) == "Microphone", "atomic replacement");
+}
+finally
+{
+    if (Directory.Exists(workingDir)) Directory.Delete(workingDir, true);
+}
+
+mapping.ResetBank(0);
+Assert(mapping.Get(0, 0) == FaderBinding.Auto && mapping.Get(0, 1) == FaderBinding.Auto, "bank reset");
+Assert(mapping.Get(1, 0) == FaderBinding.Auto, "bank reset does not alter other banks");
+
+void MustReject(string json, string scenario)
+{
+    bool rejected = false;
+    try { _ = ObsMappingProfile.FromJson(json); }
+    catch (InvalidDataException) { rejected = true; }
+    Assert(rejected, scenario);
+}
+MustReject("{\"version\":99,\"mappings\":[]}", "unknown profile format rejected");
+MustReject("{\"version\":1,\"mappings\":null}", "null mappings rejected");
+MustReject("{\"version\":1,\"mappings\":[{\"bank\":8,\"slot\":0,\"mode\":\"Auto\"}]}", "invalid bank rejected");
+MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":4,\"mode\":\"Auto\"}]}", "invalid slot rejected");
+MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Unexpected\"}]}", "invalid mode rejected");
+MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Explicit\"}]}", "explicit missing source rejected");
+MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Auto\"},{\"bank\":0,\"slot\":0,\"mode\":\"Unassigned\"}]}", "duplicate mapping rejected");
+MustReject("{not json}", "malformed profile rejected");
 Console.WriteLine($"PASS: {count} protocol / simulator / OBS adapter assertions");

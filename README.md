@@ -44,7 +44,7 @@ dotnet run --project software/FaderDeck.Studio -c Release
 - **Simulation:** four virtual faders, each with eight independent banks; no serial or physical hardware.
 - **OBS Studio:** enable the built-in WebSocket server in OBS, enter its address (default `ws://127.0.0.1:4455`) and password, then Connect. The preview discovers audio-capable inputs, reads volume and listens for changes.
 - OBS credentials are kept in memory only. Non-local plaintext `ws://` is refused.
-- **Limitations:** OBS integration has no live-instance acceptance test yet; inputs are automatically assigned in groups of four; GUI does not control real motors.
+- **Limitations:** OBS integration has no live-instance acceptance test yet; inputs default to automatic sequential assignment and can be explicitly mapped or unassigned per bank; GUI does not control real motors.
 
 See [Studio guide (简体中文)](docs/STUDIO.zh-CN.md).
 

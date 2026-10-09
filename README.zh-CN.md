@@ -32,7 +32,7 @@ dotnet run --project software/FaderDeck.Cli -- sim
 从成功的 [GitHub Actions](https://github.com/Accelerator6666/FaderDeck/actions) 中下载 **FaderDeck-Studio-Windows-x64**，将 ZIP 所有文件解压到同一个目录并运行 `FaderDeck.Studio.exe`。
 
 - `Simulation / 模拟`：四路虚拟推子、八个独立 Bank，无需外接设备。
-- `OBS Studio`：在 OBS 中启用 WebSocket 服务，输入默认地址 `ws://127.0.0.1:4455` 和密码，连接后按 Bank 显示音频输入，可以调节音量并获取事件反馈。
+- `OBS Studio`：在 OBS 中启用 WebSocket 服务，输入默认地址 `ws://127.0.0.1:4455` 和密码。连接后每路推子可选择“自动分配”“指定 OBS 音频输入”或“不绑定”，并保存当前 Bank 的选择；可调节音量并获取事件反馈。
 - 密码不会写入本地配置；程序不允许用未经加密的远程 `ws://` 地址连接。
 - GUI 尚不能连接物理 FaderBuddy，OBS 联调也还未完成。详见 [Studio 使用说明](docs/STUDIO.zh-CN.md)。
 

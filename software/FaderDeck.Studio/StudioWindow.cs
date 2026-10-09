@@ -23,6 +23,17 @@ public sealed class StudioWindow : Window
     private readonly string?[] mappedInputs = new string?[4];
     private readonly CancellationTokenSource?[] pendingSends = new CancellationTokenSource?[4];
     private readonly DateTime[] suppressFeedbackUntil = new DateTime[4];
+    private readonly ComboBox[] mappingSelectors = new ComboBox[4];
+    private readonly ObsMappingProfile mappingProfile;
+    private readonly bool canSaveMappings;
+    private IReadOnlyList<string> availableInputs = Array.Empty<string>();
+    private bool loadingMappingEditor;
+    private readonly StackPanel editorPanel;
+    private readonly TextBlock mappingSaveStatus;
+    private sealed record MappingOption(string Title, FaderBinding Binding)
+    {
+        public override string ToString() => Title;
+    }
 
     private readonly ComboBox profileSelect;
     private readonly ComboBox bankSelect;
@@ -47,6 +58,15 @@ public sealed class StudioWindow : Window
         MinWidth = 780;
         MinHeight = 620;
         Background = ColorBrush("#101827");
+
+        string? loadError = null;
+        try { mappingProfile = ObsMappingProfile.Load(ObsMappingProfile.DefaultFilePath); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            mappingProfile = new ObsMappingProfile();
+            loadError = e.Message;
+        }
+        canSaveMappings = loadError is null;
 
         var title = new TextBlock
         {
@@ -193,6 +213,60 @@ public sealed class StudioWindow : Window
             sliders[i].ValueChanged += (_, _) => HandleSliderInput(slot);
         }
 
+        editorPanel = new StackPanel { Spacing = 10, IsVisible = false };
+        var editorTitle = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12
+        };
+        editorTitle.Children.Add(new TextBlock
+        {
+            Text = "OBS 参数映射 · 本 Bank",
+            FontSize = 17,
+            FontWeight = FontWeight.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var resetBankButton = new Button
+        {
+            Content = "恢复本 Bank 自动映射",
+            IsEnabled = canSaveMappings
+        };
+        resetBankButton.Click += async (_, _) => await ResetMappingBankAsync();
+        editorTitle.Children.Add(resetBankButton);
+        editorPanel.Children.Add(editorTitle);
+        var editorGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*,*"),
+            ColumnSpacing = 10
+        };
+        for (int i = 0; i < 4; i++)
+        {
+            int slot = i;
+            var group = new StackPanel { Spacing = 4 };
+            group.Children.Add(new TextBlock { Text = $"Fader {i + 1}", FontSize = 12 });
+            mappingSelectors[i] = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinWidth = 140,
+                IsEnabled = canSaveMappings
+            };
+            mappingSelectors[i].SelectionChanged += async (_, _) => await MappingChangedAsync(slot);
+            group.Children.Add(mappingSelectors[i]);
+            Grid.SetColumn(group, i);
+            editorGrid.Children.Add(group);
+        }
+        editorPanel.Children.Add(editorGrid);
+        mappingSaveStatus = new TextBlock
+        {
+            Text = canSaveMappings
+                ? $"映射配置自动保存：{ObsMappingProfile.DefaultFilePath}"
+                : $"配置文件无法读取（停止自动保存，避免覆盖）：{loadError}",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = canSaveMappings ? ColorBrush("#9BAEC7") : ColorBrush("#E8B97F")
+        };
+        editorPanel.Children.Add(mappingSaveStatus);
+
         activityLog = new TextBlock
         {
             Text = "日志：等待操作",
@@ -209,6 +283,7 @@ public sealed class StudioWindow : Window
         root.Children.Add(heading);
         root.Children.Add(connectionRow);
         root.Children.Add(headlineStatus);
+        root.Children.Add(editorPanel);
         root.Children.Add(faderGrid);
         root.Children.Add(helpText);
         root.Children.Add(new Border
@@ -235,6 +310,8 @@ public sealed class StudioWindow : Window
             connectButton.IsEnabled = true;
             disconnectButton.IsEnabled = false;
             refreshButton.IsEnabled = false;
+            availableInputs = Array.Empty<string>();
+            UpdateMappingEditor();
             Log("OBS 连接中断：" + message);
         });
         Closed += async (_, _) => { CancelPendingSends(); await obs.DisposeAsync(); };
@@ -294,6 +371,8 @@ public sealed class StudioWindow : Window
     private void ApplyProfile()
     {
         revision++;
+        editorPanel.IsVisible = inObsMode;
+        UpdateMappingEditor();
         CancelPendingSends();
         if (inObsMode)
         {
@@ -303,7 +382,7 @@ public sealed class StudioWindow : Window
             endpointInput.IsEnabled = !obs.Connected;
             passwordInput.IsEnabled = !obs.Connected;
             headlineStatus.Text = obs.Connected ? "OBS 已连接" : "OBS 未连接 · 请启动 OBS 并配置 WebSocket";
-            helpText.Text = "OBS 会读取当前 Bank 的四个音频输入。反馈以 OBS 实际值为准；尚未读取的参数不可视为已同步。";
+            helpText.Text = "使用上方下拉框，为四路推子选择自动分配、指定音频输入或不绑定。只有成功读取 OBS 实际音量后，推子才能操作。";
             DisconnectSlots("未同步");
             if (obs.Connected) _ = RefreshObsBankAsync(revision);
         }
@@ -410,8 +489,9 @@ public sealed class StudioWindow : Window
     {
         revision++;
         CancelPendingSends();
+        UpdateMappingEditor();
         if (!inObsMode) RestoreSimulationBank();
-        else if (obs.Connected) await RefreshObsBankAsync(revision);
+        else if (obs.Connected) await ApplyMappingsAsync(revision);
         else DisconnectSlots("未连接");
     }
 
@@ -451,41 +531,153 @@ public sealed class StudioWindow : Window
         Log("主动断开 OBS");
     }
 
+    private void UpdateMappingEditor()
+    {
+        loadingMappingEditor = true;
+        try
+        {
+            int bank = Math.Max(0, bankSelect.SelectedIndex);
+            for (int slot = 0; slot < 4; slot++)
+            {
+                FaderBinding selected = mappingProfile.Get(bank, slot);
+                var options = new List<MappingOption>
+                {
+                    new("自动（按 OBS 列表顺序）", FaderBinding.Auto),
+                    new("不绑定（禁用此推子）", FaderBinding.Unassigned)
+                };
+                foreach (string input in availableInputs.Distinct(StringComparer.Ordinal))
+                    options.Add(new MappingOption(input, FaderBinding.ForInput(input)));
+                if (selected.Mode == MappingMode.Explicit
+                    && !availableInputs.Contains(selected.InputName, StringComparer.Ordinal))
+                    options.Add(new MappingOption($"未发现输入 · {selected.InputName}", selected));
+                mappingSelectors[slot].ItemsSource = options;
+                mappingSelectors[slot].SelectedItem =
+                    options.First(x => x.Binding == selected);
+                mappingSelectors[slot].IsEnabled = inObsMode && canSaveMappings;
+            }
+        }
+        finally
+        {
+            loadingMappingEditor = false;
+        }
+    }
+
+    private bool SaveMappings()
+    {
+        try
+        {
+            mappingProfile.Save(ObsMappingProfile.DefaultFilePath);
+            mappingSaveStatus.Text = $"已保存 · {ObsMappingProfile.DefaultFilePath}";
+            mappingSaveStatus.Foreground = ColorBrush("#8BDDCA");
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            mappingSaveStatus.Text = "保存失败（当前更改仅在内存中）：" + e.Message;
+            mappingSaveStatus.Foreground = ColorBrush("#E8B97F");
+            Log("映射文件保存失败：" + e.Message);
+            return false;
+        }
+    }
+
+    private async Task MappingChangedAsync(int slot)
+    {
+        if (loadingMappingEditor || !inObsMode || !canSaveMappings) return;
+        if (mappingSelectors[slot].SelectedItem is not MappingOption option) return;
+        int bank = Math.Max(0, bankSelect.SelectedIndex);
+        mappingProfile.Set(bank, slot, option.Binding);
+        SaveMappings();
+        revision++;
+        CancelPendingSends();
+        if (obs.Connected) await ApplyMappingsAsync(revision);
+        else DisconnectSlots("请先连接 OBS");
+    }
+
+    private async Task ResetMappingBankAsync()
+    {
+        if (!canSaveMappings || !inObsMode) return;
+        int bank = Math.Max(0, bankSelect.SelectedIndex);
+        mappingProfile.ResetBank(bank);
+        SaveMappings();
+        revision++;
+        CancelPendingSends();
+        UpdateMappingEditor();
+        if (obs.Connected) await ApplyMappingsAsync(revision);
+        else DisconnectSlots("请先连接 OBS");
+        Log($"Bank {bank + 1} 已恢复自动映射");
+    }
+
     private async Task RefreshObsBankAsync(int version)
     {
         if (!obs.Connected || !inObsMode) return;
         refreshButton.IsEnabled = false;
         CancelPendingSends();
-        DisconnectSlots("读取中");
+        DisconnectSlots("刷新输入列表");
         try
         {
-            IReadOnlyList<string> all = await obs.GetAudioInputsAsync();
-            if (version != revision || !inObsMode) return;
-            int start = Math.Max(0, bankSelect.SelectedIndex) * 4;
-            for (int slot = 0; slot < 4; slot++)
-            {
-                int index = start + slot;
-                if (index >= all.Count) continue;
-                string name = all[index];
-                double db = await obs.GetInputVolumeDbAsync(name);
-                if (version != revision || !inObsMode) return;
-                mappedInputs[slot] = name;
-                channelNames[slot].Text = name;
-                sliders[slot].IsEnabled = true;
-                SetVisual(slot, ObsProtocol.DbToSlider(db), "Verified · OBS 读取", true);
-            }
-            headlineStatus.Text = $"OBS 已连接 · {all.Count} 个可调音量输入 · Bank {bankSelect.SelectedIndex + 1}";
-            Log($"OBS 已读取 {all.Count} 个音频输入");
+            IReadOnlyList<string> inputs = await obs.GetAudioInputsAsync();
+            if (version != revision || !inObsMode || !obs.Connected) return;
+            availableInputs = inputs;
+            UpdateMappingEditor();
+            await ApplyMappingsAsync(version);
         }
         catch (Exception e)
         {
             if (version != revision) return;
-            headlineStatus.Text = "OBS 读取失败 · " + e.Message;
-            Log("OBS 读取失败：" + e.Message);
+            headlineStatus.Text = "OBS 刷新失败：" + e.Message;
+            Log("OBS 刷新失败：" + e.Message);
         }
         finally
         {
             if (version == revision) refreshButton.IsEnabled = obs.Connected;
+        }
+    }
+
+    private async Task ApplyMappingsAsync(int version)
+    {
+        if (!inObsMode || !obs.Connected) return;
+        CancelPendingSends();
+        DisconnectSlots("读取 OBS 实际值");
+        int bank = Math.Max(0, bankSelect.SelectedIndex);
+        for (int slot = 0; slot < 4; slot++)
+        {
+            FaderBinding binding = mappingProfile.Get(bank, slot);
+            string? name = mappingProfile.Resolve(bank, slot, availableInputs);
+            if (name is null)
+            {
+                string reason = binding.Mode switch
+                {
+                    MappingMode.Unassigned => "未绑定 · 已禁用",
+                    MappingMode.Explicit => "指定输入缺失 · 已禁用",
+                    _ => "自动映射无输入 · 已禁用"
+                };
+                SetVisual(slot, 0, reason, false);
+                continue;
+            }
+
+            try
+            {
+                double db = await obs.GetInputVolumeDbAsync(name);
+                if (version != revision || !inObsMode || !obs.Connected) return;
+                mappedInputs[slot] = name;
+                channelNames[slot].Text = name;
+                sliders[slot].IsEnabled = true;
+                SetVisual(slot, ObsProtocol.DbToSlider(db), "Verified · OBS 已读取", true);
+            }
+            catch (Exception e)
+            {
+                if (version != revision) return;
+                mappedInputs[slot] = null;
+                channelNames[slot].Text = name;
+                channelStatuses[slot].Text = "读取失败 · 禁止发送";
+                sliders[slot].IsEnabled = false;
+                Log($"OBS {name} 读取失败：{e.Message}");
+            }
+        }
+        if (version == revision)
+        {
+            headlineStatus.Text = $"OBS 已连接 · {availableInputs.Count} 个可用输入 · Bank {bank + 1}";
+            Log($"OBS Bank {bank + 1} 映射已应用");
         }
     }
 }

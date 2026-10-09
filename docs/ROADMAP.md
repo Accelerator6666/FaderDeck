@@ -28,7 +28,9 @@
 - [x] Avalonia Studio preview with 4 virtual faders and 8 banks
 - [ ] Verify OBS integration against a live OBS instance
 - [ ] Generalized adapter interfaces, reconnect, timestamps and production loop-prevention
-- [ ] JSON/YAML profile storage
+- [x] Versioned local JSON mapping profile: eight banks / four slots, Auto / Explicit / Unassigned
+- [x] Studio visual OBS input mapping editor with persistent file and safe missing-source behavior
+- [ ] Generic JSON/YAML profile schema across OBS, REAPER and DaVinci
 - [ ] Device inspector and structured logs
 - [ ] USB MIDI (native composite USB device, separately validated)
 
