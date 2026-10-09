@@ -30,14 +30,18 @@
 - [ ] Generalized adapter interfaces, reconnect, timestamps and production loop-prevention
 - [x] Versioned local JSON mapping profile: eight banks / four slots, Auto / Explicit / Unassigned
 - [x] Studio visual OBS input mapping editor with persistent file and safe missing-source behavior
-- [ ] Generic JSON/YAML profile schema across OBS, REAPER and DaVinci
+- [x] Adapter-independent v1 JSON profile schema: OBS / REAPER / DaVinci capabilities
+- [x] Legacy OBS mapping import helper (original file preserved)
+- [ ] Wire shared profile editor into Studio GUI; retire OBS-only storage after migration validation
+- [ ] Cross-app YAML import/export (JSON implemented)
 - [ ] Device inspector and structured logs
 - [ ] USB MIDI (native composite USB device, separately validated)
 
 ## M3 — first real two-way integrations
 
 - [ ] OBS WebSocket input volume read/write + change subscriptions
-- [ ] REAPER OSC transport/mixer feedback
+- [x] REAPER localhost UDP OSC volume codec and event adapter (software-only, CI-tested)
+- [ ] REAPER Studio GUI integration and actual REAPER end-to-end acceptance
 - [ ] Verified feedback-to-motor sync & human touch precedence
 
 ## M4 — ecosystem

@@ -36,6 +36,10 @@ dotnet run --project software/FaderDeck.Cli -- sim
 - 密码不会写入本地配置；程序不允许用未经加密的远程 `ws://` 地址连接。
 - GUI 尚不能连接物理 FaderBuddy，OBS 联调也还未完成。详见 [Studio 使用说明](docs/STUDIO.zh-CN.md)。
 
+## 通用 Profile 与 REAPER 适配器开发
+
+已新增应用无关的 Profile v1 定义、OBS 映射迁移工具，以及 REAPER UDP OSC 协议适配器。DaVinci 目前仅注册“公开脚本不支持任意原生调色参数读写”的能力声明，不是假装已支持调色。详细见 [REAPER 原型说明](docs/REAPER.zh-CN.md)。
+
 ## M0 接线
 
 | ESP32-S3 / 电源 | FaderBuddy |

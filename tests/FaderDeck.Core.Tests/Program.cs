@@ -1,5 +1,6 @@
 using FaderDeck.Core;
 using FaderDeck.Obs;
+using FaderDeck.Reaper;
 
 int count = 0;
 void Assert(bool condition, string message)
@@ -154,4 +155,129 @@ MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Unexp
 MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Explicit\"}]}", "explicit missing source rejected");
 MustReject("{\"version\":1,\"mappings\":[{\"bank\":0,\"slot\":0,\"mode\":\"Auto\"},{\"bank\":0,\"slot\":0,\"mode\":\"Unassigned\"}]}", "duplicate mapping rejected");
 MustReject("{not json}", "malformed profile rejected");
-Console.WriteLine($"PASS: {count} protocol / simulator / OBS adapter assertions");
+
+var universal = new ControlProfiles();
+Assert(universal.Resolve(ControlAdapters.Obs, 0, 0, ["Mic", "Music"]) ==
+    new ResolvedControl("obs", "input.volume", "Mic"), "generic OBS auto binding");
+Assert(universal.Resolve(ControlAdapters.Obs, 0, 1, ["Mic", "Music"]) ==
+    new ResolvedControl("obs", "input.volume", "Music"), "generic OBS second slot");
+Assert(universal.Resolve(ControlAdapters.Obs, 0, 2, ["Mic", "Music"]) is null, "generic missing OBS auto binding");
+Assert(universal.Resolve(ControlAdapters.Reaper, 0, 0) ==
+    new ResolvedControl("reaper", "track.volume", "1"), "REAPER first track auto");
+Assert(universal.Resolve(ControlAdapters.Reaper, 7, 3) ==
+    new ResolvedControl("reaper", "track.volume", "32"), "REAPER last track auto");
+Assert(universal.Resolve(ControlAdapters.Davinci, 0, 0) is null, "DaVinci unsupported native parameter cannot be auto bound");
+Assert(!ControlAdapters.Get("davinci", "primaries.contrast").CanWrite, "DaVinci contrast explicitly unsupported");
+Assert(ControlAdapters.Get("reaper", "track.volume").HasFeedback, "REAPER volume supports feedback");
+Assert(!ControlAdapters.Get("reaper", "track.volume").CanRead, "REAPER has no synchronous OSC snapshot API");
+
+universal.Set("obs", 0, 0, ControlBinding.Bind("input.volume", "Music"));
+Assert(universal.Resolve("obs", 0, 0, ["Music", "Mic"])?.Target == "Music", "generic OBS explicit stable when reordered");
+Assert(universal.Resolve("obs", 0, 0, ["Mic"]) is null, "generic OBS missing explicit fails closed");
+universal.Set("reaper", 0, 0, ControlBinding.Bind("track.volume", "7"));
+Assert(universal.Resolve("reaper", 0, 0)?.Target == "7", "generic REAPER explicit target");
+universal.Set("reaper", 0, 1, ControlBinding.Unassigned);
+Assert(universal.Resolve("reaper", 0, 1) is null, "generic disabled REAPER slot");
+Assert(universal.Get("reaper", 1, 0) == ControlBinding.Auto, "generic banks isolated");
+Assert(universal.Get("obs", 0, 0).Target == "Music", "generic adapters isolated");
+Assert(!universal.ToJson().Contains("password", StringComparison.OrdinalIgnoreCase), "universal profiles do not store OBS credentials");
+var reconstructed = ControlProfiles.FromJson(universal.ToJson());
+Assert(reconstructed.Get("reaper", 0, 0) == ControlBinding.Bind("track.volume", "7"), "universal profile JSON roundtrip REAPER");
+Assert(reconstructed.Get("obs", 0, 0) == ControlBinding.Bind("input.volume", "Music"), "universal profile JSON roundtrip OBS");
+universal.ResetBank("reaper", 0);
+Assert(universal.Get("reaper", 0, 0) == ControlBinding.Auto, "generic bank reset");
+Assert(universal.Get("obs", 0, 0).Target == "Music", "generic reset does not affect other adapters");
+
+bool RejectBinding(Action test)
+{
+    try { test(); return false; }
+    catch (ArgumentException) { return true; }
+}
+Assert(RejectBinding(() => universal.Set("reaper", 0, 0,
+    ControlBinding.Bind("track.volume", "33"))), "REAPER beyond range rejected");
+Assert(RejectBinding(() => universal.Set("reaper", 0, 0,
+    ControlBinding.Bind("track.volume", "01"))), "REAPER noncanonical target rejected");
+Assert(RejectBinding(() => universal.Set("davinci", 0, 0,
+    ControlBinding.Bind("primaries.contrast", "contrast"))), "unsupported DaVinci actuator blocked");
+Assert(RejectBinding(() => universal.Set("obs", 0, 0,
+    ControlBinding.Bind("input.volume", ""))), "empty target rejected");
+
+var legacy = new ObsMappingProfile();
+legacy.Set(2, 1, FaderBinding.ForInput("Mic"));
+legacy.Set(3, 0, FaderBinding.Unassigned);
+var migrated = ControlProfiles.ImportLegacyObs(legacy);
+Assert(migrated.Get("obs", 2, 1) == ControlBinding.Bind("input.volume", "Mic"), "legacy OBS explicit imported");
+Assert(migrated.Get("obs", 3, 0) == ControlBinding.Unassigned, "legacy OBS unassigned imported");
+Assert(migrated.Get("reaper", 2, 1) == ControlBinding.Auto, "import does not change REAPER");
+Assert(migrated.Resolve("obs", 2, 1, ["Mic"])?.Target == "Mic", "migrated mapping resolves");
+
+string universalFolder = Path.Combine(Path.GetTempPath(), "faderdeck-profiles-" + Guid.NewGuid().ToString("N"));
+try
+{
+    string legacyFile = Path.Combine(universalFolder, "obs.json");
+    string profileFile = Path.Combine(universalFolder, "profiles.json");
+    Directory.CreateDirectory(universalFolder);
+    legacy.Save(legacyFile);
+    var imported = ControlProfiles.LoadOrImport(profileFile, legacyFile);
+    Assert(imported.Get("obs", 2, 1).Target == "Mic", "load/import old profile");
+    imported.Save(profileFile);
+    Assert(File.Exists(legacyFile), "migration leaves old file intact");
+    Assert(ControlProfiles.LoadOrImport(profileFile, legacyFile).Get("obs", 2, 1).Target == "Mic", "new profile persisted");
+}
+finally
+{
+    if (Directory.Exists(universalFolder)) Directory.Delete(universalFolder, true);
+}
+
+void MustRejectUniversal(string json, string reason)
+{
+    bool rejected = false;
+    try { _ = ControlProfiles.FromJson(json); }
+    catch (InvalidDataException) { rejected = true; }
+    Assert(rejected, reason);
+}
+MustRejectUniversal("{\"version\":2,\"bindings\":[]}", "reject future profile schema");
+MustRejectUniversal("{\"version\":1,\"bindings\":[{\"app\":\"reaper\",\"bank\":0,\"slot\":0,\"mode\":\"Explicit\",\"parameterId\":\"track.volume\",\"target\":\"33\"}]}", "invalid REAPER target JSON rejected");
+MustRejectUniversal("{\"version\":1,\"bindings\":[{\"app\":\"reaper\",\"bank\":0,\"slot\":0,\"mode\":\"Unassigned\"},{\"app\":\"reaper\",\"bank\":0,\"slot\":0,\"mode\":\"Unassigned\"}]}", "generic duplicate rejected");
+MustRejectUniversal("{\"version\":1,\"bindings\":[{\"app\":\"davinci\",\"bank\":0,\"slot\":0,\"mode\":\"Explicit\",\"parameterId\":\"primaries.contrast\",\"target\":\"contrast\"}]}", "unsupported DaVinci JSON blocked");
+MustRejectUniversal("{INVALID", "malformed generic JSON blocked");
+
+byte[] trackPacket = OscCodec.EncodeTrackVolume(3, 0.25);
+Assert(OscCodec.TryDecodeTrackVolume(trackPacket, out int packetTrack, out double packetValue), "OSC track volume roundtrip");
+Assert(packetTrack == 3 && Math.Abs(packetValue - 0.25) < 1e-6, "OSC 32-bit float and track");
+Assert(OscCodec.TryDecodeFloat(trackPacket, out var oscAddress, out float oscFloat)
+    && oscAddress == "/track/3/volume" && Math.Abs(oscFloat - .25f) < 1e-6f, "OSC address and float");
+Assert(!OscCodec.TryDecodeTrackVolume(trackPacket.AsSpan(0, trackPacket.Length - 1), out _, out _), "truncated OSC packet rejected");
+Assert(!OscCodec.TryDecodeTrackVolume(OscCodec.EncodeFloat("/track/1/pan", .5f), out _, out _), "OSC unrelated parameter rejected");
+Assert(!OscCodec.TryDecodeTrackVolume(OscCodec.EncodeFloat("/track/1/volume", 1.5f), out _, out _), "OSC out-of-range volume rejected");
+Assert(RejectBinding(() => { _ = OscCodec.EncodeTrackVolume(0, 0.25); }), "OSC track zero blocked");
+Assert(RejectBinding(() => { _ = OscCodec.EncodeTrackVolume(33, 0.25); }), "OSC track 33 blocked");
+Assert(RejectBinding(() => { _ = OscCodec.EncodeTrackVolume(1, double.NaN); }), "OSC nonfinite volume blocked");
+
+using var reaperFake = new System.Net.Sockets.UdpClient(
+    new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+int fakeReaperPort = ((System.Net.IPEndPoint)reaperFake.Client.LocalEndPoint!).Port;
+int localPort;
+using (var probe = new System.Net.Sockets.UdpClient(
+    new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0)))
+    localPort = ((System.Net.IPEndPoint)probe.Client.LocalEndPoint!).Port;
+await using (var adapter = new ReaperOscClient())
+{
+    var feedback = new TaskCompletionSource<(int track, double value)>(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    adapter.VolumeFeedback += (track, value) => feedback.TrySetResult((track, value));
+    adapter.Start(fakeReaperPort, localPort);
+    Assert(adapter.Listening && !adapter.HasFeedback, "UDP bound but not falsely Verified");
+    await adapter.WriteTrackVolumeAsync(2, 0.4);
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+    var received = await reaperFake.ReceiveAsync(timeout.Token);
+    Assert(OscCodec.TryDecodeTrackVolume(received.Buffer, out var incomingTrack, out var incomingValue)
+        && incomingTrack == 2 && Math.Abs(incomingValue - .4) < 1e-5, "adapter UDP sends real OSC binary");
+    await reaperFake.SendAsync(OscCodec.EncodeTrackVolume(2, 0.7).AsMemory(),
+        new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, localPort), timeout.Token);
+    var confirmation = await feedback.Task.WaitAsync(timeout.Token);
+    Assert(confirmation.track == 2 && Math.Abs(confirmation.value - .7) < 1e-5
+        && adapter.HasFeedback, "adapter receives genuine UDP OSC feedback");
+}
+
+Console.WriteLine($"PASS: {count} protocol / simulator / multi-adapter assertions");

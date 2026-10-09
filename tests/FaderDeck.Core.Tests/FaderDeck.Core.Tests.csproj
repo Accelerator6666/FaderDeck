@@ -9,5 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="../../software/FaderDeck.Core/FaderDeck.Core.csproj" />
     <ProjectReference Include="../../software/FaderDeck.Obs/FaderDeck.Obs.csproj" />
+    <ProjectReference Include="../../software/FaderDeck.Reaper/FaderDeck.Reaper.csproj" />
   </ItemGroup>
 </Project>
