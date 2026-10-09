@@ -8,7 +8,7 @@
 
 **M0 bootstrap / hardware validation prototype — NOT a finished controller.**
 
-The initial proof of concept pairs **one ESP32-S3** with **one FaderBuddy** motorized fader and a **Windows .NET 10 serial diagnostic CLI**. No DaVinci Resolve, REAPER, Ableton, or OBS integration is implemented yet. USB MIDI and the desktop GUI are future milestones.
+The initial proof of concept pairs **one ESP32-S3** with **one FaderBuddy** motorized fader and a **Windows .NET 10 serial diagnostic CLI**. The **Studio preview** adds four on-screen faders, eight parameter banks and an initial OBS WebSocket v5 volume adapter. Live OBS validation is still pending; DaVinci Resolve, REAPER, Ableton and USB MIDI integrations are planned.
 
 | Part | Status |
 | --- | --- |
@@ -17,7 +17,9 @@ The initial proof of concept pairs **one ESP32-S3** with **one FaderBuddy** moto
 | Windows command-line diagnostics | Initial source |
 | VirtualFader software-only emulator | Implemented with unit tests; no hardware required |
 | Parameter synchronization safety gate | Implemented in core library with source-level tests |
-| Four-fader modules, USB MIDI, application adapters, GUI | Planned |
+| Avalonia Studio: four onscreen virtual faders | Preview implementation |
+| OBS WebSocket v5 volume read/write + event subscription | Initial adapter, live testing pending |
+| Physical four-fader hardware, USB MIDI, REAPER/DaVinci integration | Planned |
 
 ## Hardware-free simulator
 
@@ -29,6 +31,22 @@ dotnet run --project software/FaderDeck.Cli -- sim
 ```
 
 Or use `FaderDeck.Cli.exe sim --demo` from the Windows Actions artifact. See [Chinese simulator instructions](docs/SIMULATOR.zh-CN.md).
+
+## FaderDeck Studio desktop preview — NO electronics required
+
+Download **FaderDeck-Studio-Windows-x64** from a successful [CI run](https://github.com/Accelerator6666/FaderDeck/actions), extract the entire ZIP (including DLLs), and launch `FaderDeck.Studio.exe`.
+
+From source with .NET 10 SDK:
+```powershell
+dotnet run --project software/FaderDeck.Studio -c Release
+```
+
+- **Simulation:** four virtual faders, each with eight independent banks; no serial or physical hardware.
+- **OBS Studio:** enable the built-in WebSocket server in OBS, enter its address (default `ws://127.0.0.1:4455`) and password, then Connect. The preview discovers audio-capable inputs, reads volume and listens for changes.
+- OBS credentials are kept in memory only. Non-local plaintext `ws://` is refused.
+- **Limitations:** OBS integration has no live-instance acceptance test yet; inputs are automatically assigned in groups of four; GUI does not control real motors.
+
+See [Studio guide (简体中文)](docs/STUDIO.zh-CN.md).
 
 ## Hardware (M0)
 
@@ -81,6 +99,8 @@ dotnet run --project tests/FaderDeck.Core.Tests -c Release
 - `firmware/esp32-s3` — ESP-IDF single-fader M0
 - `software/FaderDeck.Core` — device framing and safe state gate
 - `software/FaderDeck.Cli` — serial hardware diagnostics
+- `software/FaderDeck.Studio` — Avalonia desktop preview
+- `software/FaderDeck.Obs` — OBS WebSocket v5 adapter
 - `tests` — dependency-free host logic tests
 - `profiles` — future adapter configuration examples
 - `docs` — protocol, architecture and roadmap

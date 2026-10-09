@@ -5,7 +5,8 @@
 ```text
 Creative apps (future)
    ↕ App Adapters (OBS WebSocket / REAPER OSC / MIDI etc.)
-Windows FaderDeck Bridge (future) — profile + state engine
+Windows FaderDeck Studio (preview: local virtual faders and OBS adapter)
+   ↕ Future profile engine / generalized application bridge
    ↕ USB MIDI + USB CDC (future composite device)
 ESP32-S3 firmware — USB, input events, I2C coordinator
    ↕ I2C @ 3.3 V logic level

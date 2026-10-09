@@ -14,7 +14,7 @@ FaderDeck 是一套可扩展的开源电动推子控制系统，规划支持 OBS
 - 上位机参数状态安全门控（仅 Verified 状态允许自动定位）
 - GitHub Actions 自动编译与核心逻辑测试
 
-**尚未实现**：OBS/REAPER/DaVinci 适配器、桌面图形管理软件、四路同步、USB MIDI、电动推子自动跟随真实软件参数。
+**已新增软件预览**：Avalonia 图形界面（四路推子、八个 Bank）和初版 OBS WebSocket v5 音量适配器，仍需真实 OBS 环境联调。**尚未实现**：REAPER/DaVinci 适配器、实体四路硬件同步、USB MIDI、真实电机自动跟随。
 
 ## 没有硬件也能测试：VirtualFader
 
@@ -26,6 +26,15 @@ dotnet run --project software/FaderDeck.Cli -- sim
 ```
 
 也可以从 GitHub Actions 下载 Windows CLI 后执行 `FaderDeck.Cli.exe sim --demo`。模拟器支持推子位置、8 层功能、触摸、故障、断开与恢复测试，但**不能代表真实硬件精度和安全性**。详见[模拟器说明](docs/SIMULATOR.zh-CN.md)。
+
+## FaderDeck Studio 图形预览（无需硬件）
+
+从成功的 [GitHub Actions](https://github.com/Accelerator6666/FaderDeck/actions) 中下载 **FaderDeck-Studio-Windows-x64**，将 ZIP 所有文件解压到同一个目录并运行 `FaderDeck.Studio.exe`。
+
+- `Simulation / 模拟`：四路虚拟推子、八个独立 Bank，无需外接设备。
+- `OBS Studio`：在 OBS 中启用 WebSocket 服务，输入默认地址 `ws://127.0.0.1:4455` 和密码，连接后按 Bank 显示音频输入，可以调节音量并获取事件反馈。
+- 密码不会写入本地配置；程序不允许用未经加密的远程 `ws://` 地址连接。
+- GUI 尚不能连接物理 FaderBuddy，OBS 联调也还未完成。详见 [Studio 使用说明](docs/STUDIO.zh-CN.md)。
 
 ## M0 接线
 

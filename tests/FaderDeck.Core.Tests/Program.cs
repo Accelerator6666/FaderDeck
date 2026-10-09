@@ -1,4 +1,5 @@
 using FaderDeck.Core;
+using FaderDeck.Obs;
 
 int count = 0;
 void Assert(bool condition, string message)
@@ -80,4 +81,18 @@ Assert(sim.Execute("MOVE 1 20 128 trailing") == "ERR INVALID_MOVE", "reject extr
 Assert(sim.Execute("LAYER 8") == "ERR INVALID_LAYER", "reject invalid layer change");
 Assert(sim.Execute("CLEAR_ERROR") == "ERR UNKNOWN_COMMAND", "sim only supports M0 commands");
 
-Console.WriteLine($"PASS: {count} core protocol/safety assertions");
+Assert(ObsProtocol.IsAllowedEndpoint(new Uri("ws://127.0.0.1:4455")), "local OBS WS allowed");
+Assert(ObsProtocol.IsAllowedEndpoint(new Uri("ws://localhost:4455")), "localhost OBS WS allowed");
+Assert(ObsProtocol.IsAllowedEndpoint(new Uri("wss://example.org:4455")), "remote TLS OBS allowed");
+Assert(!ObsProtocol.IsAllowedEndpoint(new Uri("ws://example.org:4455")), "remote plaintext OBS denied");
+Assert(ObsProtocol.SliderToMul(0) == 0, "0% OBS volume is silent");
+Assert(Math.Abs(ObsProtocol.SliderToMul(100) - 1.0) < 1e-12, "100% OBS volume = unity");
+Assert(Math.Abs(ObsProtocol.DbToSlider(-60)) < 1e-9, "minimum slider at -60dB");
+Assert(Math.Abs(ObsProtocol.DbToSlider(0) - 100) < 1e-9, "maximum slider at 0dB");
+Assert(Math.Abs(ObsProtocol.DbToSlider(ObsProtocol.SliderToDb(35)) - 35) < 1e-9, "OBS slider roundtrip");
+Assert(ObsProtocol.DbToSlider(double.NegativeInfinity) == 0, "negative infinity maps to zero");
+string obsAuth = ObsProtocol.Authentication("secret", "salt", "challenge");
+Assert(obsAuth.Length == 44 && obsAuth.EndsWith('='), "OBS auth is base64 SHA256");
+Assert(obsAuth == ObsProtocol.Authentication("secret", "salt", "challenge"), "OBS auth deterministic");
+Assert(obsAuth != ObsProtocol.Authentication("bad", "salt", "challenge"), "OBS auth depends on password");
+Console.WriteLine($"PASS: {count} protocol / simulator / OBS adapter assertions");

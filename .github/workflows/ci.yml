@@ -24,6 +24,17 @@ jobs:
         run: dotnet run --project tests/FaderDeck.Core.Tests -c Release
       - name: Run hardware-free simulator demo
         run: dotnet run --project software/FaderDeck.Cli -c Release -- sim --demo
+      - name: Build Avalonia Studio desktop
+        run: dotnet build software/FaderDeck.Studio/FaderDeck.Studio.csproj -c Release
+      - name: Publish Windows x64 Studio preview
+        run: dotnet publish software/FaderDeck.Studio/FaderDeck.Studio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/studio
+      - name: Upload Windows Studio preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: FaderDeck-Studio-Windows-x64
+          path: dist/studio/
+          if-no-files-found: error
+          retention-days: 30
       - name: Publish standalone Windows x64 CLI
         run: dotnet publish software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o dist/windows
       - name: Upload Windows diagnostic CLI

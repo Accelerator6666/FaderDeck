@@ -24,7 +24,10 @@
 
 ## M2 — host service
 
-- [ ] App adapter interfaces, reconnect, timestamps, loop-prevention
+- [x] Initial OBS WebSocket v5 authentication, volume read/write and input events
+- [x] Avalonia Studio preview with 4 virtual faders and 8 banks
+- [ ] Verify OBS integration against a live OBS instance
+- [ ] Generalized adapter interfaces, reconnect, timestamps and production loop-prevention
 - [ ] JSON/YAML profile storage
 - [ ] Device inspector and structured logs
 - [ ] USB MIDI (native composite USB device, separately validated)
