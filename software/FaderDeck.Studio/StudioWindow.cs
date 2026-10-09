@@ -368,10 +368,16 @@ public sealed class StudioWindow : Window
             await Task.Delay(85, cancel);
             if (version != revision || !inObsMode || mappedInputs[slot] != input) return;
             await obs.SetInputVolumeAsync(input, percent, cancel);
+            // Re-read authoritative OBS state: InputVolumeChanged may have been
+            // suppressed while the local fader was being dragged.
+            double confirmedDb = await obs.GetInputVolumeDbAsync(input, cancel);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (version == revision && mappedInputs[slot] == input)
-                    channelStatuses[slot].Text = "OBS 接受设置 · 等待反馈";
+                if (version == revision && mappedInputs[slot] == input && !cancel.IsCancellationRequested)
+                {
+                    suppressFeedbackUntil[slot] = DateTime.MinValue;
+                    SetVisual(slot, ObsProtocol.DbToSlider(confirmedDb), "Verified · OBS 回读", true);
+                }
             });
         }
         catch (OperationCanceledException) { /* next move wins */ }
