@@ -1,6 +1,6 @@
 # FaderDeck / 模块化电动控制台
 
-[English](README.md) · [架构](docs/ARCHITECTURE.md) · [通信协议](docs/PROTOCOL.md) · [开发路线](docs/ROADMAP.md)
+[English](README.md) · [架构](docs/ARCHITECTURE.md) · [通信协议](docs/PROTOCOL.md) · [开发路线](docs/ROADMAP.md) · [硬件验收清单](docs/HARDWARE_TEST.zh-CN.md)
 
 FaderDeck 是一套可扩展的开源电动推子控制系统，规划支持 OBS Studio、REAPER、Ableton Live 和 DaVinci Resolve 等软件。
 
@@ -48,10 +48,15 @@ M0 固件使用 ESP32-S3 内置 USB Serial/JTAG CDC，不是复合 USB 设备。
 ```powershell
 dotnet run --project software/FaderDeck.Cli -- ports
 dotnet run --project software/FaderDeck.Cli -- COM5 ping
+dotnet run --project software/FaderDeck.Cli -- COM5 info
+dotnet run --project software/FaderDeck.Cli -- COM5 diagnose
+dotnet run --project software/FaderDeck.Cli -- COM5 watch 20
 dotnet run --project software/FaderDeck.Cli -- COM5 state
 dotnet run --project software/FaderDeck.Cli -- COM5 move 0 128 128
 dotnet run --project software/FaderDeck.Cli -- COM5 layer 0
 ```
+
+CI 成功后，在 [Actions](https://github.com/Accelerator6666/FaderDeck/actions) 中可以下载 Windows x64 命令行程序和 ESP32-S3 固件（二进制包中的 `flasher_args.json` 标明刷写偏移）。[硬件验收清单](docs/HARDWARE_TEST.zh-CN.md) 包含逐步测试流程。
 
 `move` 会启动电机；`calibrate` 将触发全行程自校准。必须保证滑杆周围安全，先运行 `ping`、`state` 再进行电机测试。
 

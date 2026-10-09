@@ -22,6 +22,15 @@ jobs:
         run: dotnet build software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release
       - name: Run core tests
         run: dotnet run --project tests/FaderDeck.Core.Tests -c Release
+      - name: Publish standalone Windows x64 CLI
+        run: dotnet publish software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o dist/windows
+      - name: Upload Windows diagnostic CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: FaderDeck-Windows-CLI
+          path: dist/windows/
+          if-no-files-found: error
+          retention-days: 30
 
   esp32-firmware:
     name: ESP32-S3 ESP-IDF build
@@ -34,3 +43,14 @@ jobs:
           esp_idf_version: v5.5
           target: esp32s3
           path: firmware/esp32-s3
+      - name: Upload ESP32-S3 binaries and flashing metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: FaderDeck-ESP32S3-M0
+          path: |
+            firmware/esp32-s3/build/bootloader/bootloader.bin
+            firmware/esp32-s3/build/partition_table/partition-table.bin
+            firmware/esp32-s3/build/faderdeck_m0.bin
+            firmware/esp32-s3/build/flasher_args.json
+          if-no-files-found: error
+          retention-days: 30

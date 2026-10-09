@@ -11,7 +11,9 @@
 #define FADER_ADDR      0x20
 #define SDA_PIN         GPIO_NUM_8
 #define SCL_PIN         GPIO_NUM_9
+#define REG_VERSION     0x00
 #define REG_STATE       0x01
+#define REG_SERIAL      0x08
 #define REG_SELF_CAL    0x07
 #define REG_LAYER       0x0D
 #define REG_TARGET      0x0E
@@ -56,6 +58,43 @@ static esp_err_t read_fader_state(fader_state_t *state)
     return ESP_OK;
 }
 
+// Commands that interpret v5 state/layer registers must fail closed on a
+// different protocol version rather than accidentally issuing motor commands.
+static bool require_protocol_v5(void)
+{
+    uint8_t version = 0;
+    if (read_register(REG_VERSION, &version, 1) != ESP_OK) {
+        send_reply("ERR I2C_READ_PROTOCOL");
+        return false;
+    }
+    if (version != 5) {
+        send_reply("ERR UNSUPPORTED_PROTOCOL");
+        return false;
+    }
+    return true;
+}
+
+static void send_device_info(void)
+{
+    uint8_t protocol = 0;
+    uint8_t fw[2] = {0};
+    uint8_t serial[10] = {0};
+    if (read_register(REG_VERSION, &protocol, 1) != ESP_OK
+        || read_register(REG_FW_VERSION, fw, sizeof(fw)) != ESP_OK
+        || read_register(REG_SERIAL, serial, sizeof(serial)) != ESP_OK) {
+        send_reply("ERR I2C_INFO");
+        return;
+    }
+    char hex[21];
+    for (size_t i = 0; i < sizeof(serial); i++) {
+        snprintf(&hex[i * 2], 3, "%02X", (unsigned)serial[i]);
+    }
+    char reply[80];
+    snprintf(reply, sizeof(reply), "INFO %u %u %u %s",
+             (unsigned)protocol, (unsigned)fw[0], (unsigned)fw[1], hex);
+    send_reply(reply);
+}
+
 static bool safe_for_manual_command(void)
 {
     fader_state_t state;
@@ -63,7 +102,7 @@ static bool safe_for_manual_command(void)
         send_reply("ERR I2C_READ");
         return false;
     }
-    if (state.touch || state.mode == 1 || state.mode == 4 || state.mode == 3) {
+    if (state.touch || state.mode != 2) {
         send_reply("ERR FADER_BUSY_OR_TOUCHED");
         return false;
     }
@@ -74,7 +113,10 @@ static void handle_command(const char *line)
 {
     if (strcmp(line, "PING") == 0) {
         send_reply("PONG 1");
+    } else if (strcmp(line, "INFO") == 0) {
+        send_device_info();
     } else if (strcmp(line, "STATE") == 0) {
+        if (!require_protocol_v5()) return;
         fader_state_t state;
         if (read_fader_state(&state) != ESP_OK) {
             send_reply("ERR I2C_READ");
@@ -92,7 +134,7 @@ static void handle_command(const char *line)
             send_reply("ERR INVALID_MOVE");
             return;
         }
-        if (!safe_for_manual_command()) return;
+        if (!require_protocol_v5() || !safe_for_manual_command()) return;
         uint8_t ver[2];
         if (read_register(REG_FW_VERSION, ver, 2) != ESP_OK) {
             send_reply("ERR FW_VERSION");
@@ -117,7 +159,7 @@ static void handle_command(const char *line)
             send_reply("ERR INVALID_LAYER");
             return;
         }
-        if (!safe_for_manual_command()) return;
+        if (!require_protocol_v5() || !safe_for_manual_command()) return;
         uint8_t msg[2] = {REG_LAYER, (uint8_t)layer};
         if (send_register(msg, sizeof(msg)) != ESP_OK) {
             send_reply("ERR I2C_WRITE");
@@ -125,7 +167,7 @@ static void handle_command(const char *line)
         }
         send_reply("OK LAYER");
     } else if (strcmp(line, "CALIBRATE") == 0) {
-        if (!safe_for_manual_command()) return;
+        if (!require_protocol_v5() || !safe_for_manual_command()) return;
         uint8_t cmd = REG_SELF_CAL;
         if (send_register(&cmd, 1) != ESP_OK) {
             send_reply("ERR I2C_WRITE");
@@ -164,6 +206,7 @@ void app_main(void)
 
     char input[96];
     size_t used = 0;
+    bool discard_until_newline = false;
     for (;;) {
         char c;
         if (usb_serial_jtag_read_bytes(&c, 1, pdMS_TO_TICKS(100)) != 1) {
@@ -171,13 +214,19 @@ void app_main(void)
         }
         if (c == '\r') continue;
         if (c == '\n') {
-            input[used] = '\0';
-            if (used) handle_command(input);
+            if (!discard_until_newline) {
+                input[used] = '\0';
+                if (used) handle_command(input);
+            }
             used = 0;
+            discard_until_newline = false;
+        } else if (discard_until_newline) {
+            continue;
         } else if (used < sizeof(input) - 1) {
             input[used++] = c;
         } else {
             used = 0;
+            discard_until_newline = true;
             send_reply("ERR LINE_TOO_LONG");
         }
     }

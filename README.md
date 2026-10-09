@@ -2,7 +2,7 @@
 
 **FaderDeck** is an open-source modular motorized control surface for creative applications.
 
-[简体中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Protocol](docs/PROTOCOL.md) · [Roadmap](docs/ROADMAP.md)
+[简体中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Protocol](docs/PROTOCOL.md) · [Roadmap](docs/ROADMAP.md) · [Hardware bench checklist (中文)](docs/HARDWARE_TEST.zh-CN.md)
 
 ## Status
 
@@ -46,10 +46,15 @@ Install [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 ```powershell
 dotnet run --project software/FaderDeck.Cli -- ports
 dotnet run --project software/FaderDeck.Cli -- COM5 ping
+dotnet run --project software/FaderDeck.Cli -- COM5 info
+dotnet run --project software/FaderDeck.Cli -- COM5 diagnose
+dotnet run --project software/FaderDeck.Cli -- COM5 watch 20
 dotnet run --project software/FaderDeck.Cli -- COM5 state
 dotnet run --project software/FaderDeck.Cli -- COM5 move 0 128 128
 dotnet run --project software/FaderDeck.Cli -- COM5 layer 0
 ```
+
+You can also download a ready-to-run Windows x64 diagnostic executable and ESP32-S3 build binaries as **Actions artifacts** from a successful [CI run](https://github.com/Accelerator6666/FaderDeck/actions). The firmware bundle's `flasher_args.json` gives the flashing offsets; confirm them before using a separate flashing tool.
 
 **Warning:** `move` powers the physical motor, and `calibrate` sweeps the entire travel. Keep fingers, cables and obstacles clear. Test `ping` and `state` first.
 

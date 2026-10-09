@@ -7,7 +7,9 @@
 - [x] Windows .NET 10 serial diagnostics source
 - [x] Host protocol and synchronization gate tests source
 - [x] CI build workflows defined
-- [ ] GitHub Actions build results verified
+- [x] First GitHub Actions builds verified
+- [ ] CI downloadable artifacts verified on a successful run
+- [ ] INFO / DIAGNOSE / WATCH validated with physical FaderBuddy
 - [ ] Physical ESP32-S3 + FaderBuddy wiring validated
 - [ ] Position readback, touch blocking, manual motor moves tested
 - [ ] Disconnect/reconnect and power transient tests completed
