@@ -1,0 +1,36 @@
+name: FaderDeck CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-core:
+    name: Windows .NET build and core tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build CLI and core
+        run: dotnet build software/FaderDeck.Cli/FaderDeck.Cli.csproj -c Release
+      - name: Run core tests
+        run: dotnet run --project tests/FaderDeck.Core.Tests -c Release
+
+  esp32-firmware:
+    name: ESP32-S3 ESP-IDF build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build M0 firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5
+          target: esp32s3
+          path: firmware/esp32-s3

@@ -1,0 +1,12 @@
+.DS_Store
+.vscode/
+.idea/
+**/bin/
+**/obj/
+*.user
+*.suo
+firmware/esp32-s3/build/
+firmware/esp32-s3/sdkconfig
+firmware/esp32-s3/sdkconfig.old
+firmware/esp32-s3/managed_components/
+*.log

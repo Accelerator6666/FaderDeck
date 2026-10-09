@@ -1,0 +1,14 @@
+# Planned application profile — NOT loaded by the M0 CLI/firmware.
+profile:
+  id: obs-mixer
+  display_name: OBS Mixer
+  adapter: obs-websocket
+  version: 1
+pages:
+  - id: mixer
+    controls:
+      fader.1:
+        parameter: input_volume
+        target: "Mic/Aux"
+        feedback: required
+        takeover: verified_only

@@ -1,0 +1,65 @@
+# FaderDeck / 模块化电动控制台
+
+[English](README.md) · [架构](docs/ARCHITECTURE.md) · [通信协议](docs/PROTOCOL.md) · [开发路线](docs/ROADMAP.md)
+
+FaderDeck 是一套可扩展的开源电动推子控制系统，规划支持 OBS Studio、REAPER、Ableton Live 和 DaVinci Resolve 等软件。
+
+## 当前开发阶段：M0 验证原型
+
+**本仓库目前不是可直接使用的完整调色台。** 第一个里程碑实现：
+
+- ESP32-S3 ↔ 单个 FaderBuddy（I²C，默认地址 0x20）
+- ESP32-S3 原生 USB Serial/JTAG CDC 命令交互（尚未实现 USB MIDI）
+- Windows .NET 10 命令行测试工具
+- 上位机参数状态安全门控（仅 Verified 状态允许自动定位）
+- GitHub Actions 自动编译与核心逻辑测试
+
+**尚未实现**：OBS/REAPER/DaVinci 适配器、桌面图形管理软件、四路同步、USB MIDI、电动推子自动跟随真实软件参数。
+
+## M0 接线
+
+| ESP32-S3 / 电源 | FaderBuddy |
+| --- | --- |
+| GPIO8（示例 SDA） | SDA |
+| GPIO9（示例 SCL） | SCL |
+| 3.3V 逻辑电源 | Vio |
+| 外部稳压 5V | Vmot |
+| 共地 | GND |
+
+此映射仅作开发示例，必须对照实际 ESP32-S3 板卡引脚和 FaderBuddy 版本核对。禁止将 Vmot 5V 直接接到 ESP32 的 3.3V 引脚；测试时先检查电机电源、地址、线路及负载。原型不支持带电热插拔。
+
+## 固件编译
+
+需 ESP-IDF 5.5：
+
+```bash
+cd firmware/esp32-s3
+idf.py set-target esp32s3
+idf.py build
+idf.py -p COM5 flash
+```
+
+M0 固件使用 ESP32-S3 内置 USB Serial/JTAG CDC，不是复合 USB 设备。串口连接应选对应的 USB Serial/JTAG 端口。
+
+## Windows 测试
+
+安装 .NET 10 SDK：
+
+```powershell
+dotnet run --project software/FaderDeck.Cli -- ports
+dotnet run --project software/FaderDeck.Cli -- COM5 ping
+dotnet run --project software/FaderDeck.Cli -- COM5 state
+dotnet run --project software/FaderDeck.Cli -- COM5 move 0 128 128
+dotnet run --project software/FaderDeck.Cli -- COM5 layer 0
+```
+
+`move` 会启动电机；`calibrate` 将触发全行程自校准。必须保证滑杆周围安全，先运行 `ping`、`state` 再进行电机测试。
+
+## 设计原则
+
+1. 保留 FaderBuddy 原有 ATtiny1616 电机闭环固件，不从零重做电机算法。
+2. 主控不绑定具体软件，上位机 Adapter 负责映射。
+3. **无法验证软件参数真实值时不得自动定位电机**。
+4. 先完成可重复的单推子双向验证，再扩展四推子、USB MIDI 和桌面 UI。
+
+许可证：Apache-2.0。FaderBuddy 原项目：[scottbez1/FaderBuddy](https://github.com/scottbez1/FaderBuddy)，本用户 Fork：[Accelerator6666/FaderBuddy](https://github.com/Accelerator6666/FaderBuddy)。
