@@ -141,8 +141,7 @@ void app_main(void)
 {
     usb_serial_jtag_driver_config_t usb_cfg = {
         .tx_buffer_size = 1024,
-        .rx_buffer_size = 1024,
-        .intr_priority = 0
+        .rx_buffer_size = 1024
     };
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_cfg));
 
